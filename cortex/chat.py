@@ -32,7 +32,7 @@ class MemoryAgent:
         # Gathering the context of the last 5 chats
         messages= []
         for line in self.transcript[-5:]:
-            role= "user" if line.startsWith("User:") else "assistant"
+            role= "user" if line.startswith("User:") else "assistant"
 
             if ": " in line:
                 content = line.split(": ", 1)[1]  #string.split(separator, maxsplit)
