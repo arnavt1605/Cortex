@@ -19,9 +19,11 @@ class MemoryAgent:
     
         relevant_memories= self.db.search_memories(user_input, top_k=3)
 
+        system_context = "You are a helpful AI assistant."
+
         if relevant_memories:
             memory_points = "\n".join([f"- {mem[0]}" for mem in relevant_memories])
-            system_context = f"You are a helpful AI assistant. Here are some things you know about the user:\n{memory_points}"
+            system_context += f"Here are some things you know about the user:\n{memory_points}"
             print(f"[System: Silently injected {len(relevant_memories)} memories into context]")
 
         return system_context
