@@ -17,7 +17,7 @@ class MemoryAgent:
     def build_system_prompt(self, user_input):
         # Searches the memory related to the user prompt and build a hidden system prompt
     
-        relevant_memories= self.db.search_memories(user_input, tok_k=3)
+        relevant_memories= self.db.search_memories(user_input, top_k=3)
 
         if relevant_memories:
             memory_points = "\n".join([f"- {mem[0]}" for mem in relevant_memories])
