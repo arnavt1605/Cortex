@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 
 class SecureMemoryDB:
     def __init__(self, folder_name=".cortex", db_name= "memory.db", key_name= "secret.key"):
-        home_dir= os.path.expanduser("~")
+        home_dir= os.path.expanduser("~") # return home directory
         base_path= os.path.join(home_dir, folder_name)
 
         os.makedirs(base_path, exist_ok=True)
@@ -183,18 +183,15 @@ class SecureMemoryDB:
         return False
             
     def get_all_memories(self):
-        #Retrieves and decrypts all stored memories
         cursor = self.conn.cursor()
-        # Grab all encrypted blobs, ordered by oldest to newest
-        cursor.execute('SELECT encrypted_text FROM memories ORDER BY timestamp ASC')
+        cursor.execute('SELECT id, encrypted_text FROM memories ORDER BY timestamp ASC')
         rows = cursor.fetchall()
         
         memories = []
-        for (encrypted_blob,) in rows:
-
+        for row_id, encrypted_blob in rows:
             plain_text = self.decrypt_data(encrypted_blob)
-            memories.append(plain_text)
-            
+            memories.append((row_id, plain_text))
+        
         return memories
 
     def clear_all_memories(self):
@@ -202,7 +199,19 @@ class SecureMemoryDB:
         cursor = self.conn.cursor()
         cursor.execute('DELETE FROM memories')
         self.conn.commit()
-            
+
+    def delete_memory(self, mem_id):
+        cursor= self.conn.cursor()
+
+        #Check if id exists
+        cursor.execute("SELECT id from memories WHERE id = ?",(mem_id,))
+        if not cursor.fetchone():
+            return False
+        
+        cursor.execute("DELETE FROM memories WHERE id= ?",(mem_id,))
+        self.conn.commit()
+
+        return True
 
     
 

@@ -13,6 +13,8 @@ class MemoryAgent:
 
         self.transcript= []
 
+        self.memory_enabled= True  # To toggle incognito mode on and off
+
 
     def build_system_prompt(self, user_input):
         # Searches the memory related to the user prompt and build a hidden system prompt
@@ -84,8 +86,8 @@ class MemoryAgent:
                 if not memories:
                     print("Your memory is currently empty")
                 else:
-                    for idx, mem in enumerate(memories, 1):
-                        print(f"{idx}. {mem}")
+                    for id, mem in memories:
+                        print(f"{id}. {mem}")
                 print("-------------------------------\n")
                 continue
 
@@ -98,12 +100,40 @@ class MemoryAgent:
                     print("Action cancelled.")
                 continue 
 
+            elif user_input.lower().startswith('delete memory '):
+                id= user_input[14:].strip()
+
+                if not id.isdigit():
+                    print("Please specify a valid memory ID number.")
+                    continue
+                    
+                id_int = int(id)
+
+                if self.db.delete_memory(id_int):
+                    print(f"Successfully deleted memory entry [{id_int}].")
+                else:
+                    print(f"Error: Memory ID [{id_int}] does not exist")
+                continue
+
+            elif user_input.lower() == 'memory off':
+                self.memory_enabled = False
+                print("Incognito Mode Active: Memory retrieval and storage are suspended for this session")
+                continue
+                
+            elif user_input.lower() == 'memory on':
+                self.memory_enabled = True
+                print("Memory Mode Active: Long term memory tracking resumed")
+                continue
+
 
 
 
             self.transcript.append(f"User: {user_input}")
 
-            system_prompt = self.build_system_prompt(user_input)
+            if self.memory_enabled:
+                system_prompt = self.build_system_prompt(user_input)
+            else:
+                system_prompt = "You are a helpful AI assistant. (Note: Personal memory access is currently disabled by the user)"
             chat_history = self.get_recent_memory()
             
             # Combine the system prompt and chat history
@@ -117,6 +147,11 @@ class MemoryAgent:
 
     def end_session(self):
         #Runs when the user types exit or quit and triggers the Extractor 
+
+        if not self.memory_enabled:
+            print("\nSession closed. Incognito mode was active so no chat analysis performed.")
+            return
+
         print("\n\nClosing session. Analyzing chat for permanent facts...")
         if not self.transcript:
             return
@@ -138,7 +173,7 @@ class MemoryAgent:
             if added_count > 0:
                 print(f"Learned {added_count} new things about you!")
             else:
-                print("No *new* permanent facts found this session (duplicates ignored).")
+                print("No new permanent facts found this session (duplicates ignored).")
         else:
             print("No new permanent facts found this session.")
 
@@ -163,7 +198,7 @@ def main():
             print(f" Warning: Model '{args.model}' was not found in your local Ollama.")
             print(f"Installed models found: {', '.join(available_models)}")
             print("Please pull the model first using: 'ollama pull <model_name>'")
-            sys.exit(1) # Exit gracefully
+            sys.exit(1) 
             
     except Exception as e:
         print("Could not connect to Ollama daemon. Is Ollama running?")
