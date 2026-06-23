@@ -1,1 +1,5 @@
-cryptography
+pycryptodome
+ollama
+numpy
+sentence-transformers
+pyfiglet
