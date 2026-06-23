@@ -89,7 +89,7 @@ class SecureMemoryDB:
                        (encrypted, embedding_json))
         self.conn.commit()
 
-    def search_memories(self, query, top_k=3, fetch_k=10):
+    def search_memories(self, query, top_k=3, fetch_k=10, threshold= 0.3):
         # Two stage search from vector search to cross encoder
 
         query_vector= self.encoder.encode(query)
@@ -135,11 +135,16 @@ class SecureMemoryDB:
              broad_candidates[i]["rerank_score"] = float(cross_scores[i])
 
         broad_candidates.sort(key=lambda x: x["rerank_score"], reverse=True)
-        
-        # Return only the final top_k to the LLM
+
         final_memories = []
-        for cand in broad_candidates[:top_k]:
-             final_memories.append((cand["text"], cand["rerank_score"]))
+        for cand in broad_candidates:
+            # Check teh cross encoder score against the threshold
+            if cand["rerank_score"] >= threshold:
+                final_memories.append((cand["text"], cand["rerank_score"]))
+                
+            # Stoppped once we hit our top_k limit
+            if len(final_memories) == top_k:
+                break
             
         return final_memories
     

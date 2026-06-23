@@ -1,9 +1,18 @@
 import sys
+import os
+import json
+import time
+import subprocess
+from pathlib import Path
 import argparse
 import ollama
 from cortex.storage import SecureMemoryDB
 from cortex.extractor import MemoryExtractor
 from pyfiglet import  figlet_format
+
+CORTEX_DIR = Path.home() / ".cortex"
+QUEUE_DIR = CORTEX_DIR / "queue"
+LOCK_FILE = QUEUE_DIR / "worker.lock"
 
 class MemoryAgent:
     def __init__(self, model_name="llama3.1:8b"):
@@ -14,6 +23,8 @@ class MemoryAgent:
         self.transcript= []
 
         self.memory_enabled= True  # To toggle incognito mode on and off
+
+        QUEUE_DIR.mkdir(parents=True, exist_ok=True)
 
 
     def build_system_prompt(self, user_input):
@@ -151,31 +162,42 @@ class MemoryAgent:
         if not self.memory_enabled:
             print("\nSession closed. Incognito mode was active so no chat analysis performed.")
             return
-
-        print("\n\nClosing session. Analyzing chat for permanent facts...")
         if not self.transcript:
+            print("\n\nSession closed. No conversation took place.")
             return
             
-        full_transcript = "\n".join(self.transcript)
+        print("\n\nClosing session instantly")
+
+        timestamp= int(time.time())
+        payload= {
+            "model_name": self.model_name,
+            "transcript": self.transcript
+        }
+
+        transcript_path= QUEUE_DIR/f"transcript_{timestamp}.json"
+
+        # Write the file to the queue folder instead of sending the transcript to the LLM
+        with open(transcript_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+
         
-        new_facts = self.extractor.extract_facts(full_transcript)
+        if LOCK_FILE.exists():
+            print("Background sync active. Transcripts saved")
+            return
         
-        # Storing the facts
-        if new_facts:
-            added_count = 0
-            for fact in new_facts:
-                if not self.db.is_duplicate(fact):
-                    self.db.add_memory(fact)
-                    added_count += 1
-                else:
-                    print(f"Skipping duplicate fact: '{fact}'")
-            
-            if added_count > 0:
-                print(f"Learned {added_count} new things about you!")
-            else:
-                print("No new permanent facts found this session (duplicates ignored).")
-        else:
-            print("No new permanent facts found this session.")
+
+        print("Spawning background memory worker...")
+        try:
+            #Popen() creates a second proces and start_new_session=True makes that second process independent from the parent
+            subprocess.Popen(
+                ["python", "-m", "cortex.worker"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True 
+            )
+        except Exception as e:
+            print(f"Failed to spawn background worker automatically: {e}")
 
 
 def main():
